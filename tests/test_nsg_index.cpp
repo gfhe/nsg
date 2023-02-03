@@ -5,6 +5,16 @@
 #include <efanna2e/index_nsg.h>
 #include <efanna2e/util.h>
 
+/**
+ * 加载数据，生成data，数据点数，每个点的维度数
+ * 
+ * 数据文件格式：？
+ * 
+ * filename: 输入的数据文件
+ * data：获取加载后的数据
+ * num：获取数据中点的个数
+ * dim：获取每个数据点的维度
+*/
 void load_data(char* filename, float*& data, unsigned& num,
                unsigned& dim) {  // load data with sift10K pattern
   std::ifstream in(filename, std::ios::binary);
@@ -13,12 +23,16 @@ void load_data(char* filename, float*& data, unsigned& num,
     exit(-1);
   }
   in.read((char*)&dim, 4);
+  // 获取数据文件的长度
   in.seekg(0, std::ios::end);
   std::ios::pos_type ss = in.tellg();
   size_t fsize = (size_t)ss;
+
+  // 数据中的点个数， dim+1表示每个数据后面有一个分隔符？
   num = (unsigned)(fsize / (dim + 1) / 4);
   data = new float[(size_t)num * (size_t)dim];
 
+  // 从头将数据文件中的点数据读入data
   in.seekg(0, std::ios::beg);
   for (size_t i = 0; i < num; i++) {
     in.seekg(4, std::ios::cur);

@@ -49,8 +49,16 @@ void IndexNSG::Load(const char *filename) {
   cc /= nd_;
   // std::cout<<cc<<std::endl;
 }
+
+/**
+ * 加载 knn 图：读取文件，将knn图的数据载入final_graph_
+ * 
+ * filename： knn图的存储路径
+*/
 void IndexNSG::Load_nn_graph(const char *filename) {
   std::ifstream in(filename, std::ios::binary);
+
+  // 获取 k值和 knn图中顶点数
   unsigned k;
   in.read((char *)&k, sizeof(unsigned));
   in.seekg(0, std::ios::end);
@@ -59,9 +67,11 @@ void IndexNSG::Load_nn_graph(const char *filename) {
   size_t num = (unsigned)(fsize / (k + 1) / 4);
   in.seekg(0, std::ios::beg);
 
-  final_graph_.resize(num);
+  //分配NSG图的空间
+  final_graph_.resize(num); 
   final_graph_.reserve(num);
-  unsigned kk = (k + 3) / 4 * 4;
+
+  unsigned kk = (k + 3) / 4 * 4; //？？？ 为什么需要是4的倍数
   for (size_t i = 0; i < num; i++) {
     in.seekg(4, std::ios::cur);
     final_graph_[i].resize(k);
@@ -385,12 +395,23 @@ void IndexNSG::Link(const Parameters &parameters, SimpleNeighbor *cut_graph_) {
   }
 }
 
+/**
+ * 构造NSG图 
+ * 
+ * n：数据点个数
+ * data： 通过load_data加载的数据
+ * parameters：生成NSG图的参数
+*/
 void IndexNSG::Build(size_t n, const float *data, const Parameters &parameters) {
   std::string nn_graph_path = parameters.Get<std::string>("nn_graph_path");
   unsigned range = parameters.Get<unsigned>("R");
+  // 加载knn图到final_graph_
   Load_nn_graph(nn_graph_path.c_str());
   data_ = data;
+
+  // 初始化nsg图结构
   init_graph(parameters);
+
   SimpleNeighbor *cut_graph_ = new SimpleNeighbor[nd_ * (size_t)range];
   Link(parameters, cut_graph_);
   final_graph_.resize(nd_);
@@ -411,6 +432,7 @@ void IndexNSG::Build(size_t n, const float *data, const Parameters &parameters) 
 
   tree_grow(parameters);
 
+  // 统计出度
   unsigned max = 0, min = 1e6, avg = 0;
   for (size_t i = 0; i < nd_; i++) {
     auto size = final_graph_[i].size();

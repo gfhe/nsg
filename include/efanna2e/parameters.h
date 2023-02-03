@@ -1,8 +1,5 @@
-//
-// Copyright (c) 2017 ZJULearning. All rights reserved.
-//
-// This source code is licensed under the MIT license.
-//
+
+// 存储参数的Map，key为参数名字，value为参数的值。
 
 #ifndef EFANNA2E_PARAMETERS_H
 #define EFANNA2E_PARAMETERS_H

@@ -1,8 +1,7 @@
-//
-// Copyright (c) 2017 ZJULearning. All rights reserved.
-//
-// This source code is licensed under the MIT license.
-//
+// 邻居节点 数据结构
+// Neighbor：NSG算法使用的邻居
+// nhood ：knn图的节点表示 
+
 
 #ifndef EFANNA2E_GRAPH_H
 #define EFANNA2E_GRAPH_H
@@ -52,19 +51,26 @@ struct nhood{
     nn_new.reserve(other.nn_new.capacity());
     pool.reserve(other.pool.capacity());
   }
+  /**
+   * 往nhood中插入节点，并且保证当前点的邻居节点数量固定为 l。
+   * 待插入点id，待插入点与当前点的距离dist
+  */
   void insert (unsigned id, float dist) {
     LockGuard guard(lock);
     if (dist > pool.front().distance) return;
+    // 检查是否已经存在
     for(unsigned i=0; i<pool.size(); i++){
       if(id == pool[i].id)return;
     }
+    // 直接插入情况
     if(pool.size() < pool.capacity()){
       pool.push_back(Neighbor(id, dist, true));
       std::push_heap(pool.begin(), pool.end());
     }else{
-      std::pop_heap(pool.begin(), pool.end());
-      pool[pool.size()-1] = Neighbor(id, dist, true);
-      std::push_heap(pool.begin(), pool.end());
+      // 插入前移除节点（堆为最大堆）。
+      std::pop_heap(pool.begin(), pool.end()); // 移动堆顶元素到数组末尾
+      pool[pool.size()-1] = Neighbor(id, dist, true); // 覆盖插入节点
+      std::push_heap(pool.begin(), pool.end()); // 重构最大堆
     }
 
   }

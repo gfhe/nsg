@@ -45,7 +45,7 @@ class IndexNSG : public Index {
     typedef std::vector<SimpleNeighbors > LockGraph;
     typedef std::vector<nhood> KNNGraph;
 
-    CompactGraph final_graph_;
+    CompactGraph final_graph_;  // 最终生成的NSG图
 
     Index *initializer_;
     void init_graph(const Parameters &parameters);

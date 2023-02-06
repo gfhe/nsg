@@ -51,7 +51,7 @@ void IndexNSG::Load(const char *filename) {
 }
 
 /**
- * 加载 knn 图：读取文件，将knn图的数据载入final_graph_
+ * 加载 knn 图：读取文件，将knn图的数据载入 final_graph_
  * 
  * filename： knn图的存储路径
 */
@@ -81,6 +81,9 @@ void IndexNSG::Load_nn_graph(const char *filename) {
   in.close();
 }
 
+/**
+ * 
+*/
 void IndexNSG::get_neighbors(const float *query, const Parameters &parameter,
                              std::vector<Neighbor> &retset,
                              std::vector<Neighbor> &fullset) {
@@ -149,10 +152,20 @@ void IndexNSG::get_neighbors(const float *query, const Parameters &parameter,
   }
 }
 
+/**
+ * 获取query点的最近邻，待选集合个数为L
+ * 
+ * query：查询点
+ * parameter：
+ * flags：
+ * retset：最近邻结果集合
+ * fullset：
+*/
 void IndexNSG::get_neighbors(const float *query, const Parameters &parameter,
                              boost::dynamic_bitset<> &flags,
                              std::vector<Neighbor> &retset,
                              std::vector<Neighbor> &fullset) {
+  // 依据配置初始化 待选集合。
   unsigned L = parameter.Get<unsigned>("L");
 
   retset.resize(L + 1);
@@ -218,7 +231,13 @@ void IndexNSG::get_neighbors(const float *query, const Parameters &parameter,
   }
 }
 
+/**
+ * 初始化 NSG 图，获取导航点。
+ * 
+ * 
+*/
 void IndexNSG::init_graph(const Parameters &parameters) {
+  // 计算数据集的 重心，即所有数据点在各个维度上均值。
   float *center = new float[dimension_];
   for (unsigned j = 0; j < dimension_; j++) center[j] = 0;
   for (unsigned i = 0; i < nd_; i++) {
@@ -229,12 +248,19 @@ void IndexNSG::init_graph(const Parameters &parameters) {
   for (unsigned j = 0; j < dimension_; j++) {
     center[j] /= nd_;
   }
+
+  // 计算导航点：距离数据集质心最近的点为导航点
   std::vector<Neighbor> tmp, pool;
   ep_ = rand() % nd_;  // random initialize navigating point
   get_neighbors(center, parameters, tmp, pool);
   ep_ = tmp[0].id;
 }
 
+/**
+ * 使用多线程，按策略裁边构造NSG图。
+ * 
+ * 策略：加入候选集合的点 p满足：pq的距离 是 p与其他所有候选集合点中距离的最小值。
+*/
 void IndexNSG::sync_prune(unsigned q, std::vector<Neighbor> &pool,
                           const Parameters &parameter,
                           boost::dynamic_bitset<> &flags,
@@ -244,6 +270,7 @@ void IndexNSG::sync_prune(unsigned q, std::vector<Neighbor> &pool,
   width = range;
   unsigned start = 0;
 
+  // 遍历顶点 q 的所有的近邻顶点，计算距离后压入pool
   for (unsigned nn = 0; nn < final_graph_[q].size(); nn++) {
     unsigned id = final_graph_[q][nn];
     if (flags[id]) continue;
@@ -253,14 +280,18 @@ void IndexNSG::sync_prune(unsigned q, std::vector<Neighbor> &pool,
     pool.push_back(Neighbor(id, dist, true));
   }
 
+  // pool 排序
   std::sort(pool.begin(), pool.end());
   std::vector<Neighbor> result;
   if (pool[start].id == q) start++;
   result.push_back(pool[start]);
 
+  // 遍历pool中的每个顶点，构造待选集合，并依据策略剔除待选集合中的次优顶点，直到待选集合中的点少于配置参数。
   while (result.size() < range && (++start) < pool.size() && start < maxc) {
-    auto &p = pool[start];
-    bool occlude = false;
+    auto &p = pool[start]; // 获取待裁剪的候选顶点
+    bool occlude = false;  
+
+    // 加入候选集合的点 p满足：pq的距离 是 p与其他所有候选集合点中距离的最小值。
     for (unsigned t = 0; t < result.size(); t++) {
       if (p.id == result[t].id) {
         occlude = true;
@@ -277,6 +308,7 @@ void IndexNSG::sync_prune(unsigned q, std::vector<Neighbor> &pool,
     if (!occlude) result.push_back(p);
   }
 
+  // 转存构图结果，即构造顶点 q 的 邻居集合。
   SimpleNeighbor *des_pool = cut_graph_ + (size_t)q * (size_t)range;
   for (size_t t = 0; t < result.size(); t++) {
     des_pool[t].id = result[t].id;
@@ -377,7 +409,9 @@ void IndexNSG::Link(const Parameters &parameters, SimpleNeighbor *cut_graph_) {
       pool.clear();
       tmp.clear();
       flags.reset();
+      // 获取knn图中，每个点的最近邻。
       get_neighbors(data_ + dimension_ * n, parameters, flags, tmp, pool);
+      // 
       sync_prune(n, pool, parameters, flags, cut_graph_);
       /*
     cnt++;
@@ -412,18 +446,22 @@ void IndexNSG::Build(size_t n, const float *data, const Parameters &parameters) 
   // 初始化nsg图结构
   init_graph(parameters);
 
+  // 裁边后最多包含nd_ * range个点
   SimpleNeighbor *cut_graph_ = new SimpleNeighbor[nd_ * (size_t)range];
   Link(parameters, cut_graph_);
   final_graph_.resize(nd_);
 
   for (size_t i = 0; i < nd_; i++) {
     SimpleNeighbor *pool = cut_graph_ + i * (size_t)range;
+
+    // 获取 邻居节点池
     unsigned pool_size = 0;
     for (unsigned j = 0; j < range; j++) {
       if (pool[j].distance == -1) break;
       pool_size = j;
     }
     pool_size++;
+    // 压缩最终图索引结构，并构造连边
     final_graph_[i].resize(pool_size);
     for (unsigned j = 0; j < pool_size; j++) {
       final_graph_[i][j] = pool[j].id;
@@ -624,6 +662,13 @@ void IndexNSG::OptimizeGraph(float *data) {  // use after build or load
   CompactGraph().swap(final_graph_);
 }
 
+/**
+ * 深度优先遍历图，搜索已经连接到图中的顶点。
+ * 
+ * flag： bitset，表示加入到图的顶点
+ * root：根顶点
+ * cnt：已经加入到图的顶点的个数
+*/
 void IndexNSG::DFS(boost::dynamic_bitset<> &flag, unsigned root, unsigned &cnt) {
   unsigned tmp = root;
   std::stack<unsigned> s;
@@ -652,8 +697,12 @@ void IndexNSG::DFS(boost::dynamic_bitset<> &flag, unsigned root, unsigned &cnt) 
   }
 }
 
+/**
+ * 搜索NSG图，并将未加入NSG的顶点加入到NSG图中。
+*/
 void IndexNSG::findroot(boost::dynamic_bitset<> &flag, unsigned &root,
                         const Parameters &parameter) {
+  // 搜索未加入到图的顶点
   unsigned id = nd_;
   for (unsigned i = 0; i < nd_; i++) {
     if (flag[i] == false) {
@@ -664,10 +713,12 @@ void IndexNSG::findroot(boost::dynamic_bitset<> &flag, unsigned &root,
 
   if (id == nd_) return;  // No Unlinked Node
 
+  // 获取未加入到图的顶点的邻居顶点，并按距离由小到大排序
   std::vector<Neighbor> tmp, pool;
   get_neighbors(data_ + dimension_ * id, parameter, tmp, pool);
   std::sort(pool.begin(), pool.end());
 
+  //搜索已在图中，的与未加入图的最近的顶点；将该点作为新的root
   unsigned found = 0;
   for (unsigned i = 0; i < pool.size(); i++) {
     if (flag[pool[i].id]) {
@@ -677,6 +728,7 @@ void IndexNSG::findroot(boost::dynamic_bitset<> &flag, unsigned &root,
       break;
     }
   }
+  //若未找到，则随机建立连边到NSG图
   if (found == 0) {
     while (true) {
       unsigned rid = rand() % nd_;
@@ -688,6 +740,10 @@ void IndexNSG::findroot(boost::dynamic_bitset<> &flag, unsigned &root,
   }
   final_graph_[root].push_back(id);
 }
+
+/**
+ * 将未连接到图中的顶点，加入到DFS最近的顶点。
+*/
 void IndexNSG::tree_grow(const Parameters &parameter) {
   unsigned root = ep_;
   boost::dynamic_bitset<> flags{nd_, 0};
@@ -699,6 +755,7 @@ void IndexNSG::tree_grow(const Parameters &parameter) {
     findroot(flags, root, parameter);
     // std::cout << "new root"<<":"<<root << '\n';
   }
+  // 更新图的 最大出度
   for (size_t i = 0; i < nd_; ++i) {
     if (final_graph_[i].size() > width) {
       width = final_graph_[i].size();

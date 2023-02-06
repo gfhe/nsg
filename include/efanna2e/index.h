@@ -48,7 +48,7 @@ class Index {
   const float *data_;    //原始数据数组 句柄
   size_t nd_;
   bool has_built;
-  Distance* distance_;
+  Distance* distance_;   // 距离计算方式
 };
 
 }

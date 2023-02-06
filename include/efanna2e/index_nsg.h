@@ -71,8 +71,8 @@ class IndexNSG : public Index {
 
 
   private:
-    unsigned width;
-    unsigned ep_;
+    unsigned width;  // 图的最大出度
+    unsigned ep_;    // 导航点 id（Neighbor对象的id）
     std::vector<std::mutex> locks;
     char* opt_graph_;
     size_t node_size;

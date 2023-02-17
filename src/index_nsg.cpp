@@ -21,8 +21,12 @@ void IndexNSG::Save(const char *filename) {
   std::ofstream out(filename, std::ios::binary | std::ios::out);
   assert(final_graph_.size() == nd_);
 
+  //输出图的最大出度
   out.write((char *)&width, sizeof(unsigned));
+  // 导航点id
   out.write((char *)&ep_, sizeof(unsigned));
+
+  // 输出每个点的邻居节点：个数+详细列表
   for (unsigned i = 0; i < nd_; i++) {
     unsigned GK = (unsigned)final_graph_[i].size();
     out.write((char *)&GK, sizeof(unsigned));
@@ -484,22 +488,38 @@ void IndexNSG::Build(size_t n, const float *data, const Parameters &parameters) 
   has_built = true;
 }
 
+/**
+ * 搜索：贪心算法。从导航点开始，选择邻居点中与query 最近的点为下次搜索的点，直到无法更新topk。
+ * 
+ * query：查询点向量
+ * x：底库向量的原始数据。为什么还需要原始数据底库？？？
+ * K：返回topk
+ * parameters： 搜索参数
+ * indices： 索引
+ * 
+*/
 void IndexNSG::Search(const float *query, const float *x, size_t K,
                       const Parameters &parameters, unsigned *indices) {
   const unsigned L = parameters.Get<unsigned>("L_search");
   data_ = x;
   std::vector<Neighbor> retset(L + 1);
   std::vector<unsigned> init_ids(L);
+
+  // 标记是否搜索过
   boost::dynamic_bitset<> flags{nd_, 0};
+
   // std::mt19937 rng(rand());
   // GenRandom(rng, init_ids.data(), L, (unsigned) nd_);
 
+  // ----------------- 初始化 待选结果集合 -----------------
+  // 使用导航点的前L个邻居填充 init_ids，
   unsigned tmp_l = 0;
   for (; tmp_l < L && tmp_l < final_graph_[ep_].size(); tmp_l++) {
     init_ids[tmp_l] = final_graph_[ep_][tmp_l];
     flags[init_ids[tmp_l]] = true;
   }
 
+  // 导航点的邻居不够L时，使用随机点填充
   while (tmp_l < L) {
     unsigned id = rand() % nd_;
     if (flags[id]) continue;
@@ -508,6 +528,7 @@ void IndexNSG::Search(const float *query, const float *x, size_t K,
     tmp_l++;
   }
 
+  // 计算初始集合中元素与query点的距离
   for (unsigned i = 0; i < init_ids.size(); i++) {
     unsigned id = init_ids[i];
     float dist =
@@ -516,15 +537,19 @@ void IndexNSG::Search(const float *query, const float *x, size_t K,
     // flags[id] = true;
   }
 
+  // ----------- 选取 topk 最近邻居 --------------
+  // 对待选集合排序，从小到大
   std::sort(retset.begin(), retset.begin() + L);
   int k = 0;
   while (k < (int)L) {
+    // 标记：k的邻居在待选集合的最小位置，后续需要顺着此位置找下一次迭代起始的点
     int nk = L;
 
     if (retset[k].flag) {
       retset[k].flag = false;
       unsigned n = retset[k].id;
 
+      // 处理待选集合点的邻居点：如果未搜索过， 且与query点的距离小于待选集合有效点（最左L个点）与query 的最大距离，那么替换掉前面L个点中最大距离点。
       for (unsigned m = 0; m < final_graph_[n].size(); ++m) {
         unsigned id = final_graph_[n][m];
         if (flags[id]) continue;
@@ -538,16 +563,23 @@ void IndexNSG::Search(const float *query, const float *x, size_t K,
         if (r < nk) nk = r;
       }
     }
+
+    // 如果最小距离的点比k更小，那么从nk继续搜索，否则，增加搜索范围
     if (nk <= k)
       k = nk;
     else
       ++k;
   }
+
+  // 获取距离最近的前k个元素的id
   for (size_t i = 0; i < K; i++) {
     indices[i] = retset[i].id;
   }
 }
 
+/**
+ * 
+*/
 void IndexNSG::SearchWithOptGraph(const float *query, size_t K,
                                   const Parameters &parameters, unsigned *indices) {
   unsigned L = parameters.Get<unsigned>("L_search");
@@ -637,17 +669,34 @@ void IndexNSG::SearchWithOptGraph(const float *query, size_t K,
   }
 }
 
+/**
+ * 优化图结构
+ * 
+ * data: 图的原始数据
+ * 
+*/
 void IndexNSG::OptimizeGraph(float *data) {  // use after build or load
 
+  // 获取图的存储信息
   data_ = data;
   data_len = (dimension_ + 1) * sizeof(float);
   neighbor_len = (width + 1) * sizeof(unsigned);
   node_size = data_len + neighbor_len;
   opt_graph_ = (char *)malloc(node_size * nd_);
+
+  // 图优化：保证每个图的邻居节点最多有k个。
+  /**
+   * 对于每一个点，
+   * cur_node_offset 后增加的：
+   * cur_norm, data_[i]的所有维数据
+   * k： 邻居个数
+   * final_graph[i]的数据，取k个。
+  */
   DistanceFastL2 *dist_fast = (DistanceFastL2 *)distance_;
   for (unsigned i = 0; i < nd_; i++) {
     char *cur_node_offset = opt_graph_ + i * node_size;
     float cur_norm = dist_fast->norm(data_ + i * dimension_, dimension_);
+
     std::memcpy(cur_node_offset, &cur_norm, sizeof(float));
     std::memcpy(cur_node_offset + sizeof(float), data_ + i * dimension_,
                 data_len - sizeof(float));

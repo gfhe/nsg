@@ -105,18 +105,35 @@ struct SimpleNeighbors{
   std::vector<SimpleNeighbor> pool;
 };
 
+/**
+ * 有序待选集合插入操作：将数据插入到待选集合，并移除不符合要求的点
+ * 返回插入的位置
+ * 
+ * 问题：当待插入点距离 比最小的待选集合距离还小，直接覆盖最小点是否合理？不应该是所有元素右移吗？
+ * 
+ * addr：待选集合内存地址
+ * K：待选集合大小
+ * nn: 待插入的点
+ * 
+*/
 static inline int InsertIntoPool (Neighbor *addr, unsigned K, Neighbor nn) {
   // find the location to insert
   int left=0,right=K-1;
+  
+  // 待插入点距离 比最小的还小，则直接覆盖
   if(addr[left].distance>nn.distance){
     memmove((char *)&addr[left+1], &addr[left],K * sizeof(Neighbor));
     addr[left] = nn;
     return left;
   }
+  
+  // 待插入点距离 比最大的还大，则直接覆盖到位置K
   if(addr[right].distance<nn.distance){
     addr[K] = nn;
     return K;
   }
+
+  // 待插入点距离 在 left 到right 间，则二分查找替换点
   while(left<right-1){
     int mid=(left+right)/2;
     if(addr[mid].distance>nn.distance)right=mid;

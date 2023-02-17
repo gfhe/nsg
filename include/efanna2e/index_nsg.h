@@ -74,10 +74,10 @@ class IndexNSG : public Index {
     unsigned width;  // 图的最大出度
     unsigned ep_;    // 导航点 id（Neighbor对象的id）
     std::vector<std::mutex> locks;
-    char* opt_graph_;
-    size_t node_size;
-    size_t data_len;
-    size_t neighbor_len;
+    char* opt_graph_;       //  优化图结构
+    size_t node_size;       //  NSG图中一个节点数据占用空间大小 = data_len + neightbor_len
+    size_t data_len;        //  NSG图中向量占用的存储空间
+    size_t neighbor_len;    //  NSG图中顶点的邻居点占用空间大小，按width计算的
     KNNGraph nnd_graph;
 };
 }

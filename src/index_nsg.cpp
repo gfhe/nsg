@@ -578,7 +578,11 @@ void IndexNSG::Search(const float *query, const float *x, size_t K,
 }
 
 /**
+ * 从NSG优化图中搜索query的k个最近邻
  * 
+ * query: query点
+ * K: 最近的k个
+ * indices: 存储query结果的空间
 */
 void IndexNSG::SearchWithOptGraph(const float *query, size_t K,
                                   const Parameters &parameters, unsigned *indices) {

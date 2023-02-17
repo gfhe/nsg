@@ -75,9 +75,13 @@ int main(int argc, char** argv) {
   paras.Set<unsigned>("L_search", L);
   paras.Set<unsigned>("P_search", L);
 
+  /**
+   * 构造结果集合
+  */
   std::vector<std::vector<unsigned> > res(query_num);
   for (unsigned i = 0; i < query_num; i++) res[i].resize(K);
 
+  // search 
   auto s = std::chrono::high_resolution_clock::now();
   for (unsigned i = 0; i < query_num; i++) {
     index.SearchWithOptGraph(query_load + i * dim, K, paras, res[i].data());

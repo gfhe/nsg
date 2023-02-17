@@ -44,9 +44,9 @@ class Index {
 
   inline const float *GetDataset() const { return data_; }
  protected:
-  const size_t dimension_;
-  const float *data_;    //原始数据数组 句柄
-  size_t nd_;
+  const size_t dimension_;  // 底库向量的维数
+  const float *data_;     //原始数据数组 句柄
+  size_t nd_;             // 底库向量个数
   bool has_built;
   Distance* distance_;   // 距离计算方式
 };
